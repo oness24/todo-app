@@ -1,0 +1,4 @@
+# Default Frontend Environment Variables
+# These values will be used if not overridden in .env or system environment variables.
+
+SENTRY_DSN_FRONTEND="YOUR_SENTRY_DSN_HERE" 

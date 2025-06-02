@@ -1,0 +1,119 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main # Or your default branch
+      # - develop
+  # pull_request:
+  #   branches:
+  #     - main
+
+jobs:
+  test-and-lint:
+    name: Test and Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9' # Match your backend Dockerfile
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18' # Match your frontend Dockerfile
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+      
+      - name: Run backend tests (and linters if configured)
+        run: |
+          cd backend
+          # Add your linter commands here, e.g., flake8, black --check
+          python manage.py test
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm install
+      
+      - name: Run frontend tests (and linters if configured)
+        run: |
+          cd frontend
+          # Add your linter commands here, e.g., eslint, prettier --check
+          # npm test # Assuming you have a test script in package.json
+          echo "Frontend tests/linters would run here"
+
+  build-docker-images:
+    name: Build Docker Images
+    needs: test-and-lint # Run after tests pass
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # Only build on push to main
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Add login to Docker registry (e.g., Docker Hub, AWS ECR)
+      # - name: Log in to Docker Hub
+      #   uses: docker/login-action@v3
+      #   with:
+      #     username: ${{ secrets.DOCKER_HUB_USERNAME }}
+      #     password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Build backend Docker image
+        run: docker build -t yourusername/todo-backend:${{ github.sha }} -f backend/Dockerfile ./backend
+        # Replace yourusername with your Docker Hub username or registry path
+
+      - name: Build frontend Docker image
+        run: docker build -t yourusername/todo-frontend:${{ github.sha }} -f frontend/Dockerfile ./frontend
+        # Replace yourusername with your Docker Hub username or registry path
+
+      # Add push to Docker registry
+      # - name: Push backend image
+      #   run: docker push yourusername/todo-backend:${{ github.sha }}
+      # - name: Push frontend image
+      #   run: docker push yourusername/todo-frontend:${{ github.sha }}
+
+  deploy:
+    name: Deploy to Production
+    needs: build-docker-images # Run after images are built
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # Only deploy on push to main
+    environment: production # Optional: For environment-specific secrets and protection rules
+    steps:
+      - name: Deploy to server (example using SSH)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }} # Server IP or hostname
+          username: ${{ secrets.SSH_USER }} # SSH username
+          key: ${{ secrets.SSH_PRIVATE_KEY }} # SSH private key
+          # port: ${{ secrets.SSH_PORT }} # Default is 22
+          script: |
+            cd /path/to/your/project # Path where docker-compose.yml is on the server
+            echo "PULLING LATEST IMAGES"
+            # docker-compose pull # If images are in a registry and docker-compose.yml references them by tag
+            
+            # If images are built by the CI and not pushed to a registry, 
+            # you'd need to transfer them or build on the server.
+            # For now, assuming images are pushed to a registry and docker-compose.yml is updated.
+            
+            echo "UPDATING .env FILE (IF NEEDED - BE CAREFUL WITH SECRETS)"
+            # Potentially update .env on the server if CI manages new versions of it
+            # e.g., echo "SENTRY_DSN=${{ secrets.SENTRY_DSN_PROD }}" > .env
+            # Make sure to handle multi-line .env and existing variables carefully.
+
+            echo "STARTING SERVICES"
+            # Ensure your docker-compose.yml on the server uses the new image tags (e.g., :${{ github.sha }} or :latest)
+            # If using :latest, then `docker-compose pull` is sufficient before `up`.
+            # If using specific tags like :${{ github.sha }}, you might need to update docker-compose.yml on the server
+            # or pass image tags as environment variables to docker-compose.
+            docker-compose down
+            docker-compose -f docker-compose.yml up -d --remove-orphans
+            
+            echo "DEPLOYMENT COMPLETE" 

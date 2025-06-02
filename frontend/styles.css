@@ -1,0 +1,96 @@
+:root {
+  --primary: #6f42c1;     /* Purple */
+  --secondary: #20c997;   /* Teal */
+  --light: #f8f9fa;       /* Light gray */
+  --dark: #212529;        /* Dark gray */
+  --danger: #dc3545;      /* Red */
+}
+
+body {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  min-height: 100vh;
+  padding: 20px;
+}
+
+/* Auth container with colored background */
+.auth-container {
+  background: linear-gradient(45deg, var(--primary), var(--secondary));
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+
+/* Colored form */
+.colored-form {
+  background: rgba(255, 255, 255, 0.9);
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+/* Custom button colors */
+.btn-primary {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.btn-secondary {
+  background-color: var(--secondary);
+  border-color: var(--secondary);
+}
+
+/* Todo card styling */
+.todo-card {
+  transition: all 0.3s ease;
+  border-left: 4px solid var(--primary);
+}
+
+.todo-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 7px 14px rgba(0,0,0,0.1);
+}
+
+/* Priority indicators */
+.priority-H { border-left: 4px solid #dc3545 !important; }
+.priority-U { border-left: 4px solid #dc3545 !important; }
+.priority-M { border-left: 4px solid #fd7e14 !important; }
+.priority-L { border-left: 4px solid #20c997 !important; }
+
+@media (max-width: 768px) {
+  .auth-container {
+    border-radius: 10px;
+  }
+  
+  .colored-form {
+    padding: 20px;
+  }
+  
+  .todo-card {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+  
+  .todo-card > div:last-child {
+    margin-top: 10px;
+    align-self: flex-end;
+  }
+}
+
+@media (max-width: 576px) {
+  body {
+    padding: 10px;
+    background: #f0f2f5;
+  }
+  
+  .auth-container {
+    border-radius: 8px;
+  }
+  
+  .colored-form {
+    padding: 15px;
+  }
+  
+  .card-body {
+    padding: 15px;
+  }
+} 

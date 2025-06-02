@@ -1,0 +1,10 @@
+django
+djangorestframework
+django-cors-headers
+psycopg2-binary # Assuming PostgreSQL for production, adjust if using another DB
+gunicorn
+python-dotenv
+django-storages
+boto3
+sentry-sdk[django]
+django-silk 

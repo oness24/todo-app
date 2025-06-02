@@ -10,7 +10,14 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
+from dotenv import load_dotenv
 from pathlib import Path
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,12 +27,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-qjpe!abdo=-dnb7vt*9bk#*%&g949@o!c$!kg6zco-m3sfxa2&'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-qjpe!abdo=-dnb7vt*9bk#*%&g949@o!c$!kg6zco-m3sfxa2&') # Default for development
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# DEBUG will be True if DJANGO_DEBUG is 'True', otherwise False (or default to True if not set)
+DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = []
+# Consider loading ALLOWED_HOSTS from an environment variable too for production
+# e.g., os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
@@ -42,9 +52,12 @@ INSTALLED_APPS = [
     'corsheaders',
     'todos',
     'users',
+    'storages',
+    'silk',
 ]
 
 MIDDLEWARE = [
+    'silk.middleware.SilkyMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -122,17 +135,100 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Define STATIC_ROOT for collectstatic
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# AWS S3 STATICFILES_STORAGE SETTINGS
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
+AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME')
+
+# Construct AWS_S3_CUSTOM_DOMAIN if bucket_name and region are set, otherwise use a fallback or let it be None
+if AWS_STORAGE_BUCKET_NAME and AWS_S3_REGION_NAME:
+    AWS_S3_CUSTOM_DOMAIN = os.getenv('AWS_S3_CUSTOM_DOMAIN', f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com')
+else:
+    AWS_S3_CUSTOM_DOMAIN = os.getenv('AWS_S3_CUSTOM_DOMAIN') # Allows override or can be None if S3 not fully configured
+
+AWS_S3_OBJECT_PARAMETERS = {
+    'CacheControl': 'max-age=86400', # Cache static files for 1 day
+}
+AWS_LOCATION = 'static' # S3 folder for static files
+
+# Update STATIC_URL and STATICFILES_STORAGE only if S3 is configured
+if AWS_S3_CUSTOM_DOMAIN:
+    STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/'
+    STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+else:
+    # Fallback to default staticfiles storage if S3 is not configured
+    # STATICFILES_STORAGE can remain unset to use Django's default, or be explicit:
+    # STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+    # For this project, if S3 isn't set, we'll just use the default STATIC_URL
+    # and Django's default static file handling during development if S3 is not set up.
+    pass
+
+
+# Optional: For media files if you plan to upload them to S3 as well
+# DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+# MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+# MEDIA_ROOT = BASE_DIR / 'mediafiles' # Local path if needed before upload
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Sentry Configuration
+SENTRY_DSN = os.getenv('SENTRY_DSN')
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[
+            DjangoIntegration(),
+        ],
+        # Set traces_sample_rate to 1.0 to capture 100%
+        # of transactions for performance monitoring.
+        # Adjust as needed for production.
+        traces_sample_rate=1.0,
+        # Set profiles_sample_rate to 1.0 to profile 100%
+        # of sampled transactions.
+        # Adjust as needed for production.
+        profiles_sample_rate=1.0,
+        send_default_pii=True # If you want to send PII
+    )
+
 CORS_ALLOW_ALL_ORIGINS = True  # For development only
+
+# Production Security Settings
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    # Ensure ALLOWED_HOSTS is properly set for production in your .env or environment
+    # For example: DJANGO_ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com
+    # ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',')
+    
+    # CORS configuration for production
+    CORS_ALLOWED_ORIGINS = os.getenv('DJANGO_CORS_ALLOWED_ORIGINS', '').split(',')
+    # Example: DJANGO_CORS_ALLOWED_ORIGINS=https://yourfrontenddomain.com,https://www.yourfrontenddomain.com
+    CORS_ALLOW_ALL_ORIGINS = False # Explicitly set to False if using specific origins
+else:
+    # Development specific CORS settings (already set to True above, but can be explicit here)
+    CORS_ALLOW_ALL_ORIGINS = True
+    # Or for more control in dev:
+    # CORS_ALLOWED_ORIGINS = [
+    #    "http://localhost:8080", # Your frontend dev server
+    #    "http://127.0.0.1:8080",
+    # ]
 
 AUTH_USER_MODEL = 'users.CustomUser'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10
 }

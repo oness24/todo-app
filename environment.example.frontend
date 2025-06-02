@@ -1,0 +1,7 @@
+# Frontend Environment Variables Template
+# Copy this to .env and fill in your actual values if they are different from defaults.
+# These variables will be bundled into your frontend code by Webpack.
+
+# Sentry DSN for Frontend (Obtain from your Sentry project)
+# You can use the same DSN as the backend or a separate one for the frontend.
+SENTRY_DSN_FRONTEND= 

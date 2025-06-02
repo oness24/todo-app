@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env # Loads variables from .env in the project root for the backend
+             # Ensure your backend/.env content is consolidated here or backend/settings.py directly reads .env from root
+    volumes:
+      - ./backend:/app # Mounts the backend code for development; remove for production image
+      # If you want to persist SQLite data across container restarts (dev only):
+      # - ./backend/db.sqlite3:/app/db.sqlite3 
+    command: gunicorn --bind :8000 --workers 3 backend.wsgi:application
+    # depends_on:
+      # - db # If you add a database service like PostgreSQL
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80" # Nginx in the container runs on port 80
+    depends_on:
+      - backend # Ensures backend starts before frontend (useful but not strictly for requests)
+    # Environment variables for the frontend build process can be passed here if needed,
+    # but webpack.config.js is already set up to use DefinePlugin and dotenv-webpack
+    # which will use the .env file from the project root during the 'npm run build' step inside the Dockerfile.
+
+# Example for a PostgreSQL database service (uncomment and configure if needed)
+#  db:
+#    image: postgres:13
+#    volumes:
+#      - postgres_data:/var/lib/postgresql/data/
+#    environment:
+#      - POSTGRES_USER=youruser
+#      - POSTGRES_PASSWORD=yourpassword
+#      - POSTGRES_DB=yourdb
+#    ports:
+#      - "5432:5432"
+
+# volumes:
+#  postgres_data: # Persists PostgreSQL data 
